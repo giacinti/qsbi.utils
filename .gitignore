@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# emacs backup
+*~
+
+# vscode
+.vscode/
+
+# qisbi
+*.qdb
+*.gsb
+__working/
+__old/
