@@ -135,7 +135,5 @@ dmypy.json
 .vscode/
 
 # qisbi
-*.qdb
-*.gsb
 __working/
 __old/
