@@ -1,4 +1,3 @@
-import click
 import logging
 import xml.etree.ElementTree as ET
 import urllib.parse
@@ -6,8 +5,7 @@ import urllib.request
 
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 import qsbi.backend.sql.models as models
 
@@ -58,6 +56,10 @@ def init_db(db: Session, drop: bool) -> None:
     add_if(db, models.CategoryType, 'id', id=1, name="Debit")
 
 
+def get_audit_log_date() -> datetime:
+    return datetime.utcnow()
+
+
 def init_audit_log(db: Session) -> models.AuditLog:
     """ audit log for this update """
     user: Optional[models.User] = add_if(db, models.User, 'login',
@@ -66,7 +68,7 @@ def init_audit_log(db: Session) -> models.AuditLog:
                                          lastname="gsb2qdb",
                                          notes="gsb2qdb tool")
     alog: models.AuditLog = models.AuditLog(user=user,
-                                            date=datetime.utcnow(),
+                                            date=get_audit_log_date(),
                                             notes="automatic import by gsb2qdb tool")
     db.add(alog)
     logger.info(
@@ -229,53 +231,13 @@ def parse_gsb(file, db, alog) -> None:
                    log=alog)
 
 
-def create_session(dburl: str) -> Session:
-    engine = create_engine(dburl, connect_args={"check_same_thread": False})
-
-    session: Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)()
-    return session
-
-
-def gsb2qdb(gsb_file, db_url, drop) -> None:
-    logger.info(f"opening {gsb_file}")
+def gsb2qdb(db, gsb_file, drop) -> None:
     url: urllib.parse.ParseResult = urllib.parse.urlparse(gsb_file)
     if not url.scheme:
         url = url._replace(scheme='file')
     file = urllib.request.urlopen(url.geturl())
 
-    db: Session = create_session(db_url)
     init_db(db, drop)
     alog: models.AuditLog = init_audit_log(db)
     parse_gsb(file, db, alog)
     db.commit()
-    db.close()
-
-
-@click.command()
-@click.argument('gsb_file')
-@click.argument('db_url')
-@click.option(
-    '--drop', '-d', is_flag=True,
-    help='drop existing model tables'
-)
-def main(gsb_file, db_url, drop) -> None:
-    """convert gsb file to qsbi database
-
-    \b
-    Args:
-        gsb_file (url): the source gsb file
-        db_url (sqlalchemy db url): destination database
-
-    \b
-    Example:
-        gsb2qdb /tmp/input.gsb sqlite:////tmp/output.db
-        gsb2qdb file:///tmp/input.gsb sqlite:////tmp/output.qdb
-        gsb2qdb https://raw.githubusercontent.com/grisbi/grisbi-examples/master/Example_1.0.gsb sqlite:////tmp/example.qdb
-    """  # noqa: E501
-    gsb2qdb(gsb_file, db_url, drop)
-
-
-##############################################################################
-#
-if __name__ == "__main__":
-    main()
